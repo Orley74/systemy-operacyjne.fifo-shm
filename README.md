@@ -1,0 +1,1 @@
+# systemy-operacyjne.fifo-shm
