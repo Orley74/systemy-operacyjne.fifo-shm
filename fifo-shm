@@ -1,0 +1,219 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <signal.h> 
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <err.h>
+#define FIFOD "dane"
+#define buf 20
+#define FIFOPID "plik_z_PID"
+int K1[2]; 
+int qid;
+pid_t proces[3]; 
+int stop = 0;
+
+void wyslijPID_doProc(char *nazwa)
+{
+	int sig = open(nazwa, O_WRONLY); 	
+	write(sig, proces, sizeof(proces));
+	close(sig); 
+	unlink(nazwa);
+}
+
+void wyslijPID()
+{
+	
+	wyslijPID_doProc("1");
+	wyslijPID_doProc("2");
+	wyslijPID_doProc("3");
+}
+
+void odbierzPID(char *nazwa)
+{
+	int sig = open(nazwa, O_RDONLY);
+	read(sig, proces, sizeof(proces)); 
+	close(sig); 
+}
+
+
+void wyslijDoPozostalych(int sygnal)
+{
+	int i;
+	for(i = 0; i < 3; i++)
+	{
+		if(proces[i] != getpid())
+		{
+			kill(proces[i], sygnal);
+		}
+	}
+}
+
+void zatrzymaj(int sig)
+{
+	stop = 1; 
+	if(sig == SIGTSTP) 
+		wyslijDoPozostalych(SIGUSR2);  
+}
+
+void wznow(int sig)
+{
+	stop = 0;	
+	if(sig == SIGCONT)
+		wyslijDoPozostalych(SIGUSR1);			
+}
+
+void zakoncz()
+{
+	wyslijDoPozostalych(SIGKILL);
+	exit(3);	
+}
+
+int main(void){	
+	printf("Wybiez tryb pracy: 1-klawiatura 2-plik\n");
+
+	signal(SIGCONT, wznow); 
+	signal(SIGUSR1, wznow); 
+	signal(SIGUSR2, zatrzymaj); 
+	signal(SIGTSTP, zatrzymaj); 
+	signal(SIGINT, zakoncz); 
+	key_t  msgkey;
+    msgkey = ftok(".", 'm');
+    qid = msgget(msgkey, IPC_CREAT | 0666);
+	pipe(K1);
+	
+	mkfifo(FIFOPID, 0777); 
+	mkfifo("1", 0777); 
+	mkfifo("2", 0777); 
+	mkfifo("3", 0777); 
+	mkfifo("dane",0777);
+	
+	 int shmid;
+    key_t key;
+    char *shm;
+	if ((key = ftok(".", 'A')) == -1) 
+        errx(1, "Blad tworzenia klucza!");
+    if ((shmid = shmget(key, buf, IPC_CREAT | 0666)) < 0) 
+    	errx(2, "Blad tworzenia segmentu pamieci dzielonej!");
+    if ((shm = shmat(shmid, (void*)0, 0)) == (char *) -1)
+    	errx(3, "Blad przylaczania pamieci dzielonej!");
+    	
+	if((proces[0] = fork()) == 0){
+		odbierzPID("1");
+		int choice;
+		scanf("%d",&choice);
+		char paczkaP2[15]; 
+		close(K1[0]); 
+		int odczytane = 0;
+		int fd=open("dane",O_WRONLY);
+	if(choice==1)
+	while(stop);
+		while(1)	
+		if((odczytane = read(STDIN_FILENO, paczkaP2, sizeof(paczkaP2))) > 0) 
+		{					 
+			write(fd, paczkaP2, odczytane); 
+		}
+		
+if(choice==2){
+	char filepath[50];
+	
+	 printf("\nPodaj sciezke pliku:\n");
+    scanf("%s", filepath);
+    FILE * fp = fopen(filepath, "r");
+		while(1){
+			while(stop);	
+		if((fgets(paczkaP2, sizeof(paczkaP2), fp)>0)){
+			write(K1[1], paczkaP2, strlen(paczkaP2)); 
+		}
+			 
+			
+		}
+	}
+	
+	if(choice==3){
+    FILE * fp = fopen("//dev/urandom", "r");
+		while(1){	
+		if((odczytane = fread(paczkaP2, sizeof(paczkaP2), 150,fp)) > 0){
+			write(K1[1], paczkaP2, odczytane); 
+		}
+			while(stop); 
+			
+		}
+	}
+
+}
+	if((proces[1] = fork()) == 0){	
+	odbierzPID("2");	
+	close(K1[1]); 
+	
+	char paczkaP2[50]; 	
+	char paczkaP3[90];
+	char hexChar[30]; 
+	int odczytane = 0;
+	int fd=open("dane",O_RDONLY);
+	
+	while(1){
+		odczytane=0;
+		
+		strcpy(paczkaP2, "");
+		//shm=0;
+		if((odczytane = read(fd, paczkaP2, sizeof(paczkaP2))) > 0) 
+		{	
+			strcpy(paczkaP3, "");
+			while(stop);
+			int i;
+			int k=1;
+			
+			for(i = 0; i < odczytane; i++) {						
+				sprintf(hexChar, "%02X ", (unsigned char) paczkaP2[i]); 
+				strcat(paczkaP3, hexChar);
+			}
+			//strcat(shm, "*");
+			//strcat(paczkaP3, "*");
+			sprintf(shm,"%s",paczkaP3);
+			
+			//fprintf(stderr,"%s",shm);
+			odczytane=0;
+		}	
+		
+	
+}
+	
+}
+	if((proces[2] = fork()) == 0){
+			odbierzPID("3");
+	while(1){
+		if(strlen(shm)>0){
+				fprintf(stderr,"%s",shm);
+				strcpy(shm, "");
+		}
+		while(stop); 
+		
+		
+	}
+}		
+	
+	
+	wyslijPID();
+	
+	waitpid(proces[0], NULL, 0);
+	waitpid(proces[1], NULL, 0);
+	waitpid(proces[2], NULL, 0);
+
+	
+	close(K1[0]);
+	close(K1[1]);
+	
+	msgctl( qid, IPC_RMID, 0);
+	
+	unlink(FIFOPID);
+	
+	return 0;
+}	
